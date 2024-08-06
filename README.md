@@ -15,6 +15,7 @@ ToDo's:
 
 
 
+
 install 
 apt install libcap-dev libcap2-bin  libcap2
 
@@ -24,3 +25,11 @@ pip3 install numpy --upgrade
 pip3 install picamera2
 
 python3 -m venv --system-site-packages .venv
+
+
+### System service setup
+Edit file `picam.service` and adjust to your path ( `ExecStart=/usr/local/bin/PiCam_API_2......` ).  
+To run fdia as a service on startup with root permissions  
+copy `picam.service`to `/etc/systemd/system/`to your RPi systemd deamon folder.  
+Run `systemctl daemon-reload` and `systemctl start fdia`to start it as a service.  
+Enable system service with `systemctl enable picam.service`.

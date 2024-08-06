@@ -1,0 +1,22 @@
+[Unit]
+Description=PiCam_API_2
+Documentation=https://github.com/OliverDrechsler/PiCam_API_2
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+#Type=simple
+ExecStart=/usr/local/bin/PiCam_API_2/.venv/bin/python3 /usr/local/bin/PiCam_API_2/foto_api.py
+
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=process
+KillSignal=SIGINT
+LimitNOFILE=65536
+Restart=on-failure
+RestartSec=60
+User=root
+Group=root
+
+
+[Install]
+WantedBy=multi-user.target
