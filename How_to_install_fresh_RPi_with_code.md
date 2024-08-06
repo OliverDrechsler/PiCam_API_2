@@ -51,6 +51,6 @@ sudo apt install -y python3-prctl libatlas-base-dev ffmpeg libopenjp2-7
     because python fdia code runs in python virtualenv therefore we've to call this python3 executable before.
 36. To run PiCam_API_2 as a service on startup with root permissions  
     copy `picam.service`to `/etc/systemd/system/`to your RPi systemd deamon folder.  
-37. Run `systemctl daemon-reload` and `systemctl start fdia`to start it as a service.
-38. check log output `journalctl -xu fdia -f`
+37. Run `systemctl daemon-reload` and `systemctl start picam`to start it as a service.
+38. check log output `journalctl -xu picam -f`
 39. activate new service `systemctl enable picam.service`
