@@ -4,8 +4,9 @@ from flask import Flask, request, send_file
 from flask_restx import Api, Resource, fields
 try:
     from picamera2 import Picamera2
-except Exception:
-    pass
+    from libcamera import Transform
+except ImportError:
+    Picamera2 = None
 import time
 
 # Initialize Flask app
@@ -37,19 +38,19 @@ model = app.model(
             help="Specify the height in pixels like 640x480 means 480 in height"
         ),
         'rotation': fields.Integer(
-            default=90,
+            default=0,
             required=False,
             description="Photo rotation in degrees",
-            help="Photo rotation in degrees, e.g., 90"
+            help="Photo rotation in degrees, should be 0, 90, 180, or 270"
         ),
         'exposure': fields.String(
             default='auto',
             required=False,
-            description="Photo exposure mode",
-            help="Photo mode auto, night, etc."
+            description="Photo exposure mode or exposure time",
+            help="Photo mode auto, night, sports, etc., or exposure time in microseconds"
         ),
         'iso': fields.Integer(
-            default=0,
+            default=100,
             required=False,
             description="Photo ISO",
             help="ISO Mode 0 ... 800"
@@ -121,27 +122,81 @@ class MainClass(Resource):
                 400, e.__doc__, status="Could not save information", statusCode="400"
             )
 
-
 def take_foto(width, height, rotation, exposure, iso, filename):
+    if Picamera2 is None:
+        raise RuntimeError("Picamera2 library is not installed.")
+
     picam2 = Picamera2()
+
     try:
-        picam2.configure(picam2.create_still_configuration(main={"size": (width, height)}))
-        picam2.controls.Rotation = rotation
-        picam2.controls.ExposureMode = exposure
-        picam2.controls.ISO = iso
+        # Set the transform based on rotation
+        transform = None
+        if rotation == 0:
+            transform = Transform(rotation=0)
+        elif rotation == 90:
+            transform = Transform(rotation=90)
+        elif rotation == 180:
+            transform = Transform(rotation=180)
+        elif rotation == 270:
+            transform = Transform(rotation=270)
+        else:
+            raise ValueError("Rotation must be one of 0, 90, 180, or 270.")
+
+        # Create configuration
+        config = picam2.create_still_configuration(
+            main={"size": (width, height)},
+            transform=transform,
+            buffer_count=1
+        )
+
+        # Apply configuration
+        picam2.configure(config)
+
+        # Set controls based on exposure and ISO
+        controls = {}
+        if exposure == 'auto':
+            controls['AeEnable'] = True
+        elif exposure == 'night':
+            controls['AeEnable'] = True
+            controls['AeMode'] = 'night'
+        elif exposure == 'sports':
+            controls['AeEnable'] = True
+            controls['AeMode'] = 'sports'
+        elif exposure.isdigit():
+            controls['AeEnable'] = False
+            controls['ExposureTime'] = int(exposure)
+        else:
+            raise ValueError(f"Invalid exposure value: {exposure}. Must be 'auto', 'night', 'sports', or a numerical value.")
+
+        if 'AnalogueGain' in picam2.camera_controls:
+            controls['AnalogueGain'] = iso
+
+        if controls:
+            picam2.set_controls(controls)
+
+        # Start camera
         picam2.start()
-        time.sleep(2)  # Allow camera to adjust settings
+
+        # Allow camera to adjust settings
+        time.sleep(2)
+
+        # Set output file path
         file_path = os.path.join('/tmp/', filename)
+
+        # Remove file if it exists
         if os.path.exists(file_path):
             os.remove(file_path)
+
+        # Capture image
         picam2.capture_file(file_path)
+
     finally:
+        # Stop camera and release resources
         picam2.stop()
         picam2.close()
 
 
 if __name__ == "__main__":
-    take_foto(640, 480, 90, 'auto', 100, 'foto.jpg')
     flask_app.run(
         host=os.getenv('IP', '0.0.0.0'),
         port=8000,
