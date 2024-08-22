@@ -7,6 +7,7 @@ try:
     from libcamera import Transform
 except ImportError:
     Picamera2 = None
+from PIL import Image
 import time
 
 # Initialize Flask app
@@ -19,7 +20,7 @@ app = Api(
 )
 
 # Define namespace
-name_space = app.namespace('foto', description='Foto API')
+name_space = app.namespace('foto', description='Foto API 2')
 
 # Define data model for the API
 model = app.model(
@@ -68,7 +69,7 @@ model = app.model(
 class MainClass(Resource):
 
     @app.doc(
-        responses={200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error'},
+        responses={200: 'OK', 400: 'Invalid Argument', 500: 'Internal Server Error'},
         params={'filename': 'Specify the photo filename'}
     )
     def get(self):
@@ -77,25 +78,32 @@ class MainClass(Resource):
             file_path = os.path.join('/tmp/', filename)
             if os.path.exists(file_path):
                 response = send_file(file_path, as_attachment=True)
-                os.remove(file_path)
+                try:
+                    os.remove(file_path)
+                except FileNotFoundError:
+                    # Log this if needed, but continue
+                    pass
                 return response
             else:
-                raise KeyError("File not found")
+                # Return 404 not found
+                return {"message": "File not found", "statusCode": "404"}, 404
 
-        except KeyError as e:
+        except Exception as e:
+            # Log the actual exception here if needed for debugging
             name_space.abort(
                 500, e.__doc__, status="Could not retrieve information", statusCode="500"
             )
-        except Exception as e:
-            name_space.abort(
-                400, e.__doc__, status="Could not retrieve information", statusCode="400"
-            )
-
     @app.doc(responses={200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error'})
     @app.expect(model)
     def post(self):
         try:
             json_input = request.get_json()
+            # Ensure all expected keys are present
+            required_fields = ['width', 'height', 'rotation', 'exposure', 'iso', 'filename']
+            for field in required_fields:
+                if field not in json_input:
+                    return {"message": f"Missing required field: {field}", "statusCode": "400"}, 400
+
             take_foto(
                 width=json_input['width'],
                 height=json_input['height'],
@@ -113,87 +121,31 @@ class MainClass(Resource):
                 "filename": json_input['filename']
             }
 
-        except KeyError as e:
-            name_space.abort(
-                500, e.__doc__, status="Could not save information", statusCode="500"
-            )
         except Exception as e:
             name_space.abort(
                 400, e.__doc__, status="Could not save information", statusCode="400"
             )
 
-def take_foto(width, height, rotation, exposure, iso, filename):
+def take_foto(width: int, height: int, rotation: int, exposure: str, iso: int, filename: str):
+    print(width, height, rotation, exposure, iso, filename)
     if Picamera2 is None:
         raise RuntimeError("Picamera2 library is not installed.")
-
     picam2 = Picamera2()
+    camera_config = picam2.create_still_configuration(main={"size": (width, height)}, buffer_count=1)
+    print(camera_config)
+    picam2.configure(camera_config)
+    picam2.start()
+    file_path = os.path.join('/tmp/', filename)
+    if os.path.exists(file_path):
+        os.remove(file_path)
+    picam2.capture_file(file_path)
+    picam2.stop()
+    picam2.close()
 
-    try:
-        # Set the transform based on rotation
-        transform = None
-        if rotation == 0:
-            transform = Transform(rotation=0)
-        elif rotation == 90:
-            transform = Transform(rotation=90)
-        elif rotation == 180:
-            transform = Transform(rotation=180)
-        elif rotation == 270:
-            transform = Transform(rotation=270)
-        else:
-            raise ValueError("Rotation must be one of 0, 90, 180, or 270.")
-
-        # Create configuration
-        config = picam2.create_still_configuration(
-            main={"size": (width, height)},
-            transform=transform,
-            buffer_count=1
-        )
-
-        # Apply configuration
-        picam2.configure(config)
-
-        # Set controls based on exposure and ISO
-        controls = {}
-        if exposure == 'auto':
-            controls['AeEnable'] = True
-        elif exposure == 'night':
-            controls['AeEnable'] = True
-            controls['AeMode'] = 'night'
-        elif exposure == 'sports':
-            controls['AeEnable'] = True
-            controls['AeMode'] = 'sports'
-        elif exposure.isdigit():
-            controls['AeEnable'] = False
-            controls['ExposureTime'] = int(exposure)
-        else:
-            raise ValueError(f"Invalid exposure value: {exposure}. Must be 'auto', 'night', 'sports', or a numerical value.")
-
-        if 'AnalogueGain' in picam2.camera_controls:
-            controls['AnalogueGain'] = iso
-
-        if controls:
-            picam2.set_controls(controls)
-
-        # Start camera
-        picam2.start()
-
-        # Allow camera to adjust settings
-        time.sleep(2)
-
-        # Set output file path
-        file_path = os.path.join('/tmp/', filename)
-
-        # Remove file if it exists
-        if os.path.exists(file_path):
-            os.remove(file_path)
-
-        # Capture image
-        picam2.capture_file(file_path)
-
-    finally:
-        # Stop camera and release resources
-        picam2.stop()
-        picam2.close()
+    with Image.open(file_path) as img:
+        if rotation != 0:
+            rotated_img = img.rotate(rotation, expand=True)
+            rotated_img.save(file_path)
 
 
 if __name__ == "__main__":
@@ -202,6 +154,3 @@ if __name__ == "__main__":
         port=8000,
         debug=True
     )
-
-# Run app manually
-# export FLASK_RUN_PORT=8000 && FLASK_APP=foto_api.py flask run
