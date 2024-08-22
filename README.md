@@ -1,6 +1,6 @@
 # PiCam API
 
-## Simple Raspberry Pi Zero 2W  Camera Flask REST-API
+## Simple Raspberry Pi Zero 2W  Camera Flask REST-API and makes use of libcamera2
 
 This project is still under `development` but works as POC!!!  
 
