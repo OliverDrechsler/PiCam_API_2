@@ -21,12 +21,12 @@ class TestFotoAPI(TestCase):
         mock_send_file.return_value = "File Content"
 
         # Act
-        response = self.client.get('/foto/', query_string={'filename': 'test.jpg'})
+        response = self.client.get('/foto/?filename=foto.jpg')
 
         # Assert
         self.assertEqual(response.status_code, 200)
         self.assertEqual(b'"File Content"\n', response.data)
-        mock_send_file.assert_called_once_with('/tmp/test.jpg', as_attachment=True)
+        mock_send_file.assert_called_once_with('/tmp/foto.jpg', as_attachment=True)
 
     @patch('foto_api.os.path.exists')
     def test_get_foto_file_not_found(self, mock_os_path_exists):
@@ -52,7 +52,7 @@ class TestFotoAPI(TestCase):
             "rotation": 0,
             "exposure": "auto",
             "iso": 100,
-            "filename": "test.jpg"
+            "filename": "/tmp/foto.jpg"  # Fügen Sie das fehlende Argument hinzu
         }
 
         # Act
@@ -67,7 +67,7 @@ class TestFotoAPI(TestCase):
             rotation=0,
             exposure="auto",
             iso=100,
-            filename="test.jpg"
+            filename="/tmp/foto.jpg"  # Fügen Sie das fehlende Argument hinzu
         )
 
     @patch('foto_api.take_foto')
@@ -79,8 +79,7 @@ class TestFotoAPI(TestCase):
             "height": 480,
             "rotation": 0,
             "exposure": "auto",
-            "iso": 100,
-            "filename": "test.jpg"
+            "iso": 100
         }
 
         # Act
@@ -95,7 +94,7 @@ class TestFotoAPI(TestCase):
     def test_take_foto_picamera_not_installed(self):
         """Test take_foto when Picamera2 library is not installed."""
         with self.assertRaises(RuntimeError) as context:
-            take_foto(640, 480, 0, "auto", 100, "test.jpg")
+            take_foto(640, 480, 0, "auto", 100, "/tmp/foto.jpg")  # Fügen Sie das fehlende Argument hinzu
         self.assertEqual(str(context.exception), "Picamera2 library is not installed.")
 
 
