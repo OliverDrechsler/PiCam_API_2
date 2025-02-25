@@ -55,27 +55,21 @@ model = app.model(
             required=False,
             description="Photo ISO",
             help="ISO Mode 0 ... 800"
-        ),
-        'filename': fields.String(
-            default='foto.jpg',
-            required=False,
-            description="Filename",
-            help="Photo filename"
-        ),
+        )
     }
 )
 
 @name_space.route("/")
 class MainClass(Resource):
+    # Define static class variable with path
+    filename = '/tmp/foto.jpg'
 
     @app.doc(
-        responses={200: 'OK', 400: 'Invalid Argument', 500: 'Internal Server Error'},
-        params={'filename': 'Specify the photo filename'}
+        responses={200: 'OK', 400: 'Invalid Argument', 500: 'Internal Server Error'}
     )
     def get(self):
-        filename = request.args.get('filename', default='foto.jpg', type=str)
         try:
-            file_path = os.path.join('/tmp/', filename)
+            file_path = MainClass.filename
             if os.path.exists(file_path):
                 response = send_file(file_path, as_attachment=True)
                 try:
@@ -93,13 +87,14 @@ class MainClass(Resource):
             name_space.abort(
                 500, e.__doc__, status="Could not retrieve information", statusCode="500"
             )
+
     @app.doc(responses={200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error'})
     @app.expect(model)
     def post(self):
         try:
             json_input = request.get_json()
             # Ensure all expected keys are present
-            required_fields = ['width', 'height', 'rotation', 'exposure', 'iso', 'filename']
+            required_fields = ['width', 'height', 'rotation', 'exposure', 'iso']
             for field in required_fields:
                 if field not in json_input:
                     return {"message": f"Missing required field: {field}", "statusCode": "400"}, 400
@@ -110,7 +105,7 @@ class MainClass(Resource):
                 rotation=json_input['rotation'],
                 exposure=json_input['exposure'],
                 iso=json_input['iso'],
-                filename=json_input['filename']
+                filename=MainClass.filename
             )
             return {
                 "status": "new foto created",
@@ -118,7 +113,7 @@ class MainClass(Resource):
                 "foto rotation": json_input['rotation'],
                 "exposure mode": json_input['exposure'],
                 "iso": json_input['iso'],
-                "filename": json_input['filename']
+                "filename": MainClass.filename
             }
 
         except Exception as e:
