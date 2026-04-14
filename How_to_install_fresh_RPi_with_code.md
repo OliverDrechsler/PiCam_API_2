@@ -32,6 +32,13 @@ apt install libcap-dev libcap2-bin  libcap2
 
 sudo apt install -y python3-libcamera python3-kms++
 sudo apt install -y python3-prctl libatlas-base-dev ffmpeg libopenjp2-7
+sudo sudo apt install libcamera-apps
+sudo apt install libcamera-tools
+sudo apt install libcamera0
+sudo apt install python3-picamera2
+
+
+rasp-config   # enable camera
 ```
 24. `python3 -m venv --system-site-packages .venv` create a python virtualenv.
 25. `chmod +x .venv/bin/activate`
@@ -46,11 +53,38 @@ sudo apt install -y python3-prctl libatlas-base-dev ffmpeg libopenjp2-7
 31.  now run `direnv allow`
 32.  `.venv/bin/pip3 install -r requirements.txt`to install required libs.
 33.    configure now `config.yaml`
-34. `.venv/bin/python3 -m fdia` test run
+34. `.venv/bin/python3 -m foto_api` test run
 35. Edit file `picam.service` and adjust to your path to `ExecStart=/usr/local/bin/.......`  
-    because python fdia code runs in python virtualenv therefore we've to call this python3 executable before.
+    because python PiCam_API_2 code runs in python virtualenv therefore we've to call this python3 executable before.
 36. To run PiCam_API_2 as a service on startup with root permissions  
     copy `picam.service`to `/etc/systemd/system/`to your RPi systemd deamon folder.  
 37. Run `systemctl daemon-reload` and `systemctl start picam`to start it as a service.
 38. check log output `journalctl -xu picam -f`
 39. activate new service `systemctl enable picam.service`
+40. checkout rpi camera lib docu here https://www.raspberrypi.com/documentation/computers/camera_software.html#building-libcamera-and-rpicam-apps
+41. Overlay Filesystem enable
+    ```
+    sudo raspi-config nonint enable_overlayfs
+    sudo reboot
+    ```
+42. disable overlay filesystem
+    ```
+    sudo raspi-config nonint disable_overlayfs
+    sudo reboot
+    ```
+
+````
+curl -X 'POST' \
+  'http://192.168.101.7:8000/foto/' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "width": 2592,
+  "height": 1944,
+  "rotation": 90,
+  "exposure": "auto",
+  "iso": 800
+}'
+```
+
+
