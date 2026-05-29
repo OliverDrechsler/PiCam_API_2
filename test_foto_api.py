@@ -1,102 +1,100 @@
-import os
 import unittest
-from unittest.mock import patch, MagicMock
-from flask import Flask
-from flask_testing import TestCase
-from foto_api import flask_app, take_foto
+from pathlib import Path
+from unittest.mock import patch
+
+import foto_api
+from foto_api import PHOTO_DIR, flask_app, photo_store, photo_store_lock, take_foto
 
 
-class TestFotoAPI(TestCase):
-    def create_app(self):
-        # Configure Flask to run in testing mode
-        flask_app.config['TESTING'] = True
-        return flask_app
+class TestFotoAPI(unittest.TestCase):
+    def setUp(self):
+        flask_app.config["TESTING"] = True
+        self.client = flask_app.test_client()
 
-    @patch('foto_api.os.path.exists')
-    @patch('foto_api.send_file')
-    def test_get_foto_success(self, mock_send_file, mock_os_path_exists):
-        """Test GET /foto/ when file exists."""
-        # Arrange
-        mock_os_path_exists.return_value = True
-        mock_send_file.return_value = "File Content"
+    def tearDown(self):
+        with photo_store_lock:
+            photo_store.clear()
 
-        # Act
-        response = self.client.get('/foto/?filename=foto.jpg')
+    def test_get_requires_photo_id(self):
+        response = self.client.get("/foto/")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn(b"photo_id query parameter is required", response.data)
 
-        # Assert
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(b'"File Content"\n', response.data)
-        mock_send_file.assert_called_once_with('/tmp/foto.jpg', as_attachment=True)
-
-    @patch('foto_api.os.path.exists')
-    def test_get_foto_file_not_found(self, mock_os_path_exists):
-        """Test GET /foto/ when file does not exist."""
-        # Arrange
-        mock_os_path_exists.return_value = False
-
-        # Act
-        response = self.client.get('/foto/', query_string={'filename': 'test.jpg'})
-
-        # Assert
+    def test_get_photo_not_found(self):
+        response = self.client.get("/foto/?photo_id=missing")
         self.assertEqual(response.status_code, 404)
-        self.assertIn(b"File not found", response.data)
+        self.assertIn(b"Photo not found", response.data)
 
-    @patch('foto_api.take_foto')
+    @patch("foto_api.send_file")
+    def test_get_photo_success(self, mock_send_file):
+        photo_id = "photo123"
+        file_path = PHOTO_DIR / f"{photo_id}.jpg"
+        file_path.touch()
+        with photo_store_lock:
+            photo_store[photo_id] = file_path
+
+        mock_response = flask_app.response_class("file-content", status=200)
+        mock_send_file.return_value = mock_response
+
+        response = self.client.get(f"/foto/?photo_id={photo_id}")
+
+        self.assertEqual(response.status_code, 200)
+        mock_send_file.assert_called_once_with(file_path, as_attachment=True, download_name=file_path.name)
+        self.assertNotIn(photo_id, photo_store)
+
+    @patch("foto_api.take_foto")
     def test_post_foto_success(self, mock_take_foto):
-        """Test POST /foto/ with valid data."""
-        # Arrange
-        mock_take_foto.return_value = None
         payload = {
             "width": 640,
             "height": 480,
             "rotation": 0,
             "exposure": "auto",
             "iso": 100,
-            "filename": "/tmp/foto.jpg"  # Fügen Sie das fehlende Argument hinzu
         }
 
-        # Act
-        response = self.client.post('/foto/', json=payload)
+        response = self.client.post("/foto/", json=payload)
 
-        # Assert
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"new foto created", response.data)
+        data = response.get_json()
+        self.assertEqual(data["foto resolution"], "640x480")
+        self.assertIn("photo_id", data)
+
+        expected_path = (PHOTO_DIR / f"{data['photo_id']}.jpg").resolve()
         mock_take_foto.assert_called_once_with(
             width=640,
             height=480,
             rotation=0,
             exposure="auto",
             iso=100,
-            filename="/tmp/foto.jpg"  # Fügen Sie das fehlende Argument hinzu
+            file_path=expected_path,
         )
 
-    @patch('foto_api.take_foto')
-    def test_post_foto_missing_key(self, mock_take_foto):
-        """Test POST /foto/ with missing required data."""
-        # Arrange
-        mock_take_foto.return_value = None
+    @patch("foto_api.take_foto")
+    def test_post_foto_invalid_rotation(self, mock_take_foto):
         payload = {
+            "width": 640,
             "height": 480,
-            "rotation": 0,
+            "rotation": 45,
             "exposure": "auto",
-            "iso": 100
+            "iso": 100,
         }
 
-        # Act
-        response = self.client.post('/foto/', json=payload)
+        response = self.client.post("/foto/", json=payload)
 
-        # Assert
         self.assertEqual(response.status_code, 400)
-        self.assertIn(b"Missing required field: width", response.data)
+        self.assertIn(b"rotation must be one of 0, 90, 180, 270", response.data)
         mock_take_foto.assert_not_called()
 
-    @patch('foto_api.Picamera2', None)
+    def test_take_foto_rejects_outside_photo_directory(self):
+        with self.assertRaises(ValueError):
+            take_foto(640, 480, 0, "auto", 100, Path("/tmp/not-allowed.jpg"))
+
+    @patch.object(foto_api, "Picamera2", None)
     def test_take_foto_picamera_not_installed(self):
-        """Test take_foto when Picamera2 library is not installed."""
-        with self.assertRaises(RuntimeError) as context:
-            take_foto(640, 480, 0, "auto", 100, "/tmp/foto.jpg")  # Fügen Sie das fehlende Argument hinzu
-        self.assertEqual(str(context.exception), "Picamera2 library is not installed.")
+        file_path = PHOTO_DIR / "test.jpg"
+        with self.assertRaises(RuntimeError):
+            take_foto(640, 480, 0, "auto", 100, file_path)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
