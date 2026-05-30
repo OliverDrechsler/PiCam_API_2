@@ -22,6 +22,10 @@ except ImportError:
         def String(**kwargs):
             return kwargs
 
+        @staticmethod
+        def Raw(**kwargs):
+            return kwargs
+
     class Api:
         def __init__(self, app, **kwargs):
             self.app = app
@@ -134,6 +138,54 @@ model = app.model(
     },
 )
 
+post_response_model = app.model(
+    "Foto Create Response",
+    {
+        "status": fields.String(
+            description="Status message for the created photo",
+            example="new foto created",
+        ),
+        "photo_id": fields.String(
+            description="Identifier used to download the created photo",
+            example="9eecb7e71f324f2e8e4c3019d65fbc4a",
+        ),
+        "foto resolution": fields.String(
+            description="Photo resolution in WIDTHxHEIGHT format",
+            example="640x480",
+        ),
+        "foto rotation": fields.Integer(
+            description="Applied photo rotation",
+            example=0,
+        ),
+        "exposure mode": fields.String(
+            description="Applied exposure mode or exposure time",
+            example="auto",
+        ),
+        "iso": fields.Integer(
+            description="Applied ISO value",
+            example=100,
+        ),
+    },
+)
+
+get_response_model = app.model(
+    "Foto Download Response",
+    {
+        "content": fields.Raw(
+            description="JPEG file returned as the response body",
+            example="<binary jpeg data>",
+        ),
+        "content_type": fields.String(
+            description="MIME type of the returned file",
+            example="image/jpeg",
+        ),
+        "filename": fields.String(
+            description="Name of the downloaded file",
+            example="9eecb7e71f324f2e8e4c3019d65fbc4a.jpg",
+        ),
+    },
+)
+
 
 def _bad_request(message: str):
     return {"message": message, "statusCode": "400"}, 400
@@ -206,7 +258,7 @@ def pop_photo_path(photo_id: str):
 class MainClass(Resource):
     @app.doc(
         params={"photo_id": "Identifier returned by POST /foto/"},
-        responses={200: "OK", 400: "Invalid Argument", 404: "Not Found", 500: "Internal Server Error"},
+        responses={200: ("OK", get_response_model), 400: "Invalid Argument", 404: "Not Found", 500: "Internal Server Error"},
     )
     def get(self):
         photo_id = request.args.get("photo_id", "").strip()
@@ -235,7 +287,7 @@ class MainClass(Resource):
             flask_app.logger.exception("Failed to deliver photo %s", photo_id)
             return {"message": "Could not retrieve photo", "statusCode": "500"}, 500
 
-    @app.doc(responses={200: "OK", 400: "Invalid Argument", 500: "Internal Server Error"})
+    @app.doc(responses={200: ("OK", post_response_model), 400: "Invalid Argument", 500: "Internal Server Error"})
     @app.expect(model)
     def post(self):
         try:
