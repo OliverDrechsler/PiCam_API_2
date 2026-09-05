@@ -36,7 +36,8 @@ sudo apt install -y python3-prctl ffmpeg libopenjp2-7
 sudo sudo apt install libcamera-apps
 sudo apt install libcamera-tools
 sudo apt install libcamera0
-sudo apt install python3-picamera2
+
+sudo apt install python3-picamera2 python3-picamera2-doc
 
 
 raspi-config nonint get_config_var camera_auto_detect /boot/firmware/config.txt
