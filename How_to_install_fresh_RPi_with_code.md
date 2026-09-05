@@ -51,7 +51,7 @@ sudo reboot
 27. `sudo apt install direnv`
 28. add `eval "$(direnv hook bash)"`  to `~/.bashrc`
 29. run `source ~/.bashrc`
-30. create `.envrc`  in fdia dir and add lines 
+30. create `.envrc`  in PiCam_API_2 dir and add lines 
     ```
     export VIRTUAL_ENV=./.venv
     layout python-venv $VIRTUAL_ENV
