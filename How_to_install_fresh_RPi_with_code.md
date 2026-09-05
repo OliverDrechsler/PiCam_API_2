@@ -58,8 +58,7 @@ sudo reboot
     ```
 31.  now run `direnv allow`
 32.  `.venv/bin/pip3 install -r requirements.txt`to install required libs.
-33.    configure now `config.yaml`
-34. `.venv/bin/python3 -m foto_api` test run
+33.  `.venv/bin/python3 -m foto_api` test run
 35. Edit file `picam.service` and adjust to your path to `ExecStart=/usr/local/bin/.......`  
     because python PiCam_API_2 code runs in python virtualenv therefore we've to call this python3 executable before.
 36. To run PiCam_API_2 as a service on startup with root permissions  
