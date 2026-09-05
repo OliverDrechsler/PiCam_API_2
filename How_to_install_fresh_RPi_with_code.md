@@ -24,9 +24,10 @@
 19. show network config run `nmcli -p connection show "Wired connection 1"`
 20. Now it's time to install required base software `sudo apt install mc git screen curl python3-pip python3.11-venv direnv`
 21. `cd /usr/local/bin`
-22. `git clone https://github.com/OliverDrechsler/PiCam_API_2.git` clone repo.
-23. `cd PiCam_API_2`
-24. install system python packages e.g. for picamera2 and it's libs
+22. `sudo apt install git`
+23. `git clone https://github.com/OliverDrechsler/PiCam_API_2.git` clone repo.
+24. `cd PiCam_API_2`
+25. install system python packages e.g. for picamera2 and it's libs
 ```
 apt install libcap-dev libcap2-bin  libcap2
 
@@ -47,9 +48,10 @@ sudo reboot
 24. `python3 -m venv --system-site-packages .venv` create a python virtualenv.
 25. `chmod +x .venv/bin/activate`
 26. `.venv/bin/activate`
-27. add `eval "$(direnv hook bash)"`  to `~/.bashrc`
-28. run `source ~/.bashrc`
-29. create `.envrc`  in fdia dir and add lines 
+27. `sudo apt install direnv`
+28. add `eval "$(direnv hook bash)"`  to `~/.bashrc`
+29. run `source ~/.bashrc`
+30. create `.envrc`  in fdia dir and add lines 
     ```
     export VIRTUAL_ENV=./.venv
     layout python-venv $VIRTUAL_ENV
