@@ -38,7 +38,11 @@ sudo apt install libcamera0
 sudo apt install python3-picamera2
 
 
-rasp-config   # enable camera
+raspi-config nonint get_config_var camera_auto_detect /boot/firmware/config.txt
+# check if output is: camera_auto_detect=1
+# if not
+echo "camera_auto_detect=1" | sudo tee -a /boot/firmware/config.txt
+sudo reboot
 ```
 24. `python3 -m venv --system-site-packages .venv` create a python virtualenv.
 25. `chmod +x .venv/bin/activate`
