@@ -25,13 +25,13 @@
 20. Now it's time to install required base software `sudo apt install mc git screen curl python3-pip python3.11-venv direnv`
 21. `cd /usr/local/bin`
 22. `git clone https://github.com/OliverDrechsler/PiCam_API_2.git` clone repo.
-23. `cd front_door_intercom_automation`
+23. `cd PiCam_API_2`
 24. install system python packages e.g. for picamera2 and it's libs
 ```
 apt install libcap-dev libcap2-bin  libcap2
 
 sudo apt install -y python3-libcamera python3-kms++
-sudo apt install -y python3-prctl libatlas-base-dev ffmpeg libopenjp2-7
+sudo apt install -y python3-prctl ffmpeg libopenjp2-7
 sudo sudo apt install libcamera-apps
 sudo apt install libcamera-tools
 sudo apt install libcamera0
