@@ -34,5 +34,23 @@ copy `picam.service`to `/etc/systemd/system/`to your RPi systemd deamon folder.
 Run `systemctl daemon-reload` and `systemctl start fdia`to start it as a service.  
 Enable system service with `systemctl enable picam.service`.
 
+### Camera lifetime and exposure logging
+
+When `foto_api.py` is started, the camera is configured at `640x480` and its
+stream remains active for the lifetime of the process. A photo request only
+captures a frame. If a request asks for a different resolution, the camera is
+briefly reconfigured and then remains running at that resolution.
+
+For every saved image the application log records the values actually used by
+libcamera, for example:
+
+```
+Captured frame: ExposureTime=12345 us, AnalogueGain=1.0, DigitalGain=1.0, FrameDuration=33333 us
+```
+
+`exposure: "auto"` enables auto exposure; a numeric value disables it and sets
+`ExposureTime` in microseconds. `iso: 0` retains automatic gain; other ISO
+values are translated approximately to libcamera's `AnalogueGain` (`ISO / 100`).
+
 ## How to run unit-tests
 `pytest --cov=./ --cov-report=html`

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import atexit
 import os
 import threading
 import uuid
@@ -95,6 +96,10 @@ ALLOWED_EXPOSURES = {"auto"}
 photo_store = {}
 photo_store_lock = threading.Lock()
 camera_lock = threading.Lock()
+picam2 = None
+camera_size = None
+
+DEFAULT_CAMERA_SIZE = (640, 480)
 
 
 flask_app = Flask(__name__)
@@ -254,6 +259,91 @@ def pop_photo_path(photo_id: str):
         return photo_store.pop(photo_id, None)
 
 
+def _configure_and_start_camera(width: int, height: int):
+    """Configure the shared camera if needed and keep its preview stream running.
+
+    The caller must hold ``camera_lock``.
+    """
+    global picam2, camera_size
+
+    if Picamera2 is None:
+        raise RuntimeError("Picamera2 library is not installed.")
+
+    requested_size = (width, height)
+    if picam2 is None:
+        picam2 = Picamera2()
+
+    if camera_size == requested_size:
+        return
+
+    if camera_size is not None:
+        picam2.stop()
+
+    camera_config = picam2.create_still_configuration(
+        main={"size": requested_size},
+        buffer_count=1,
+    )
+    picam2.configure(camera_config)
+    picam2.start()
+    camera_size = requested_size
+    flask_app.logger.info("Camera started with resolution %dx%d", width, height)
+
+
+def start_camera():
+    """Start the camera once when the API process starts."""
+    with camera_lock:
+        _configure_and_start_camera(*DEFAULT_CAMERA_SIZE)
+
+
+def stop_camera():
+    """Release the shared camera during a graceful process shutdown."""
+    global picam2, camera_size
+
+    with camera_lock:
+        if picam2 is None:
+            return
+        try:
+            picam2.stop()
+        except Exception:
+            flask_app.logger.warning("Could not stop camera cleanly")
+        try:
+            picam2.close()
+        finally:
+            picam2 = None
+            camera_size = None
+
+
+atexit.register(stop_camera)
+
+
+def _camera_controls(exposure: str, iso: int):
+    """Translate API exposure/ISO values to libcamera controls."""
+    controls = {}
+    if exposure == "auto":
+        controls["AeEnable"] = True
+    else:
+        controls["AeEnable"] = False
+        controls["ExposureTime"] = int(exposure)
+
+    # ISO 0 keeps automatic gain. libcamera exposes gain rather than ISO;
+    # ISO 100 is approximately AnalogueGain 1.0.
+    if iso > 0:
+        controls["AnalogueGain"] = iso / 100.0
+    return controls
+
+
+def _log_capture_metadata(metadata):
+    """Log values actually used for the saved frame, not just requested values."""
+    flask_app.logger.info(
+        "Captured frame: ExposureTime=%s us, AnalogueGain=%s, DigitalGain=%s, "
+        "FrameDuration=%s us",
+        metadata.get("ExposureTime"),
+        metadata.get("AnalogueGain"),
+        metadata.get("DigitalGain"),
+        metadata.get("FrameDuration"),
+    )
+
+
 @name_space.route("/")
 class MainClass(Resource):
     @app.doc(
@@ -329,25 +419,18 @@ def take_foto(width: int, height: int, rotation: int, exposure: str, iso: int, f
     if file_path.parent != PHOTO_DIR.resolve():
         raise ValueError("file_path must stay inside the photo directory")
 
-    if Picamera2 is None:
-        raise RuntimeError("Picamera2 library is not installed.")
-
     with camera_lock:
-        picam2 = Picamera2()
+        _configure_and_start_camera(width, height)
+        picam2.set_controls(_camera_controls(exposure, iso))
+        capture_request = None
         try:
-            camera_config = picam2.create_still_configuration(
-                main={"size": (width, height)},
-                buffer_count=1,
-            )
-            picam2.configure(camera_config)
-            picam2.start()
-            picam2.capture_file(str(file_path))
+            # A request contains both the image and metadata from the same frame.
+            capture_request = picam2.capture_request()
+            capture_request.save("main", str(file_path))
+            _log_capture_metadata(capture_request.get_metadata())
         finally:
-            try:
-                picam2.stop()
-            except Exception:
-                flask_app.logger.warning("Could not stop camera cleanly")
-            picam2.close()
+            if capture_request is not None:
+                capture_request.release()
 
     with Image.open(file_path) as img:
         if rotation != 0:
@@ -356,6 +439,7 @@ def take_foto(width: int, height: int, rotation: int, exposure: str, iso: int, f
 
 
 if __name__ == "__main__":
+    start_camera()
     flask_app.run(
         host=os.getenv("IP", "0.0.0.0"),
         port=8000,

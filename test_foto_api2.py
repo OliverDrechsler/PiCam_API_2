@@ -54,20 +54,31 @@ class TestFotoAPIValidation(unittest.TestCase):
     @patch.object(foto_api, "Picamera2")
     @patch("foto_api.Image.open")
     def test_take_foto_no_rotation(self, mock_image_open, mock_picamera):
+        foto_api.picam2 = None
+        foto_api.camera_size = None
         mock_picam_instance = MagicMock()
         mock_picamera.return_value = mock_picam_instance
+        mock_request = MagicMock()
+        mock_picam_instance.capture_request.return_value = mock_request
 
         take_foto(640, 480, 0, "auto", 100, PHOTO_DIR / "test.jpg")
 
         mock_picam_instance.create_still_configuration.assert_called_once()
-        mock_picam_instance.capture_file.assert_called_once()
+        mock_picam_instance.start.assert_called_once()
+        mock_picam_instance.set_controls.assert_called_once_with({"AeEnable": True, "AnalogueGain": 1.0})
+        mock_request.save.assert_called_once_with("main", str((PHOTO_DIR / "test.jpg").resolve()))
+        mock_request.get_metadata.assert_called_once()
+        mock_request.release.assert_called_once()
         mock_image_open.assert_called_once()
 
     @patch.object(foto_api, "Picamera2")
     @patch("foto_api.Image.open")
     def test_take_foto_with_rotation(self, mock_image_open, mock_picamera):
+        foto_api.picam2 = None
+        foto_api.camera_size = None
         mock_picam_instance = MagicMock()
         mock_picamera.return_value = mock_picam_instance
+        mock_picam_instance.capture_request.return_value = MagicMock()
         mock_image = MagicMock()
         mock_image_open.return_value.__enter__.return_value = mock_image
 
