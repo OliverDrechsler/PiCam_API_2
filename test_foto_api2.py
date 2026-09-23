@@ -3,7 +3,7 @@ import logging
 from unittest.mock import MagicMock, patch
 
 import foto_api
-from foto_api import PHOTO_DIR, flask_app, take_foto, validate_photo_request
+from foto_api import PHOTO_DIR, capture_logger, flask_app, take_foto, validate_photo_request
 
 
 class TestFotoAPIValidation(unittest.TestCase):
@@ -54,6 +54,10 @@ class TestFotoAPIValidation(unittest.TestCase):
 
     def test_application_logger_allows_info_messages(self):
         self.assertEqual(flask_app.logger.getEffectiveLevel(), logging.INFO)
+
+    def test_capture_logger_allows_info_messages(self):
+        self.assertEqual(capture_logger.getEffectiveLevel(), logging.INFO)
+        self.assertFalse(capture_logger.propagate)
 
     @patch.object(foto_api, "Picamera2")
     @patch("foto_api.Image.open")

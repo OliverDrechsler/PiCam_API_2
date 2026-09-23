@@ -2,6 +2,7 @@
 import atexit
 import logging
 import os
+import sys
 import threading
 import uuid
 from pathlib import Path
@@ -110,6 +111,19 @@ flask_app.logger.setLevel(logging.INFO)
 flask_app.logger.propagate = False
 for log_handler in flask_app.logger.handlers:
     log_handler.setLevel(logging.INFO)
+
+# Keep capture metadata separate from Flask's request logger.  This handler
+# writes directly to stderr, which systemd forwards to the service journal.
+capture_logger = logging.getLogger("picam_api.capture")
+capture_logger.setLevel(logging.INFO)
+capture_logger.propagate = False
+if not capture_logger.handlers:
+    capture_handler = logging.StreamHandler(sys.stderr)
+    capture_handler.setLevel(logging.INFO)
+    capture_handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    )
+    capture_logger.addHandler(capture_handler)
 app = Api(
     app=flask_app,
     version="2.0",
@@ -341,7 +355,7 @@ def _camera_controls(exposure: str, iso: int):
 
 def _log_capture_metadata(metadata):
     """Log values actually used for the saved frame, not just requested values."""
-    flask_app.logger.info(
+    capture_logger.info(
         "Captured frame: ExposureTime=%s us, AnalogueGain=%s, DigitalGain=%s, "
         "FrameDuration=%s us",
         metadata.get("ExposureTime"),
@@ -389,6 +403,13 @@ class MainClass(Resource):
     def post(self):
         try:
             photo_request = validate_photo_request(request.get_json())
+            capture_logger.info(
+                "Photo request received: resolution=%dx%d, exposure=%s, iso=%s",
+                photo_request["width"],
+                photo_request["height"],
+                photo_request["exposure"],
+                photo_request["iso"],
+            )
             photo_id = uuid.uuid4().hex
             file_path = create_photo_path(photo_id)
 
