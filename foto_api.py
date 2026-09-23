@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import atexit
+import logging
 import os
 import threading
 import uuid
@@ -103,6 +104,12 @@ DEFAULT_CAMERA_SIZE = (640, 480)
 
 
 flask_app = Flask(__name__)
+# Flask otherwise inherits Python's default WARNING threshold. Explicitly use
+# stderr so systemd stores camera INFO messages in `journalctl`.
+flask_app.logger.setLevel(logging.INFO)
+flask_app.logger.propagate = False
+for log_handler in flask_app.logger.handlers:
+    log_handler.setLevel(logging.INFO)
 app = Api(
     app=flask_app,
     version="2.0",

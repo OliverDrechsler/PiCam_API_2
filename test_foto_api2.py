@@ -1,4 +1,5 @@
 import unittest
+import logging
 from unittest.mock import MagicMock, patch
 
 import foto_api
@@ -50,6 +51,9 @@ class TestFotoAPIValidation(unittest.TestCase):
             }
         )
         self.assertEqual(result["exposure"], "5000")
+
+    def test_application_logger_allows_info_messages(self):
+        self.assertEqual(flask_app.logger.getEffectiveLevel(), logging.INFO)
 
     @patch.object(foto_api, "Picamera2")
     @patch("foto_api.Image.open")
